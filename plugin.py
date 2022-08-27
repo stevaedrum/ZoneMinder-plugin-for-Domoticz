@@ -92,6 +92,10 @@ class BasePlugin:
 		return
 
 	def onStart(self):
+		#Domoticz.Debugging(1)
+		#Domoticz.Log("Debugger started, use 'telnet 0.0.0.0 4444' to connect")
+		#import rpdb
+		#rpdb.set_trace()
 		Domoticz.Log("onStart called")
 		Domoticz.Heartbeat(30)
 
@@ -114,12 +118,14 @@ class BasePlugin:
 
 				for monitor in monitors['monitors']:
 					Id = monitor['Monitor']['Id']
+					IdState = str(Id) +"1"
+					IdOnOff = str(Id)+"2"
+					Domoticz.Log("Id "+str(Id)+" IdState "+str(IdState)+" IdOnOff "+str(IdOnOff))
 					Name = monitor['Monitor']['Name']
-				
 					Options = {"LevelActions": "|||||||","LevelNames": "None|Monitor|Modect|Record|Mocord|Nodect","LevelOffHidden": "True","SelectorStyle": "0"}
-					Domoticz.Device(Name="Monitor "+str(Name)+" Function",  Unit=int(Id+"1"), TypeName="Selector Switch", Switchtype=18, Image=12, Options=Options).Create()
+					Domoticz.Device(Name="Monitor "+str(Name)+" Function",  Unit=int(IdState), TypeName="Selector Switch", Switchtype=18, Image=12, Options=Options).Create()
 					Domoticz.Log("Device Monitor "+str(Name)+" Function with id "+str(Id)+"1 was created.")
-					Domoticz.Device(Name="Monitor "+str(Name)+" Status", Unit=int(Id+"2"), Type=17, Switchtype=0).Create()
+					Domoticz.Device(Name="Monitor "+str(Name)+" Status", Unit=int(IdOnOff), Type=17, Switchtype=0).Create()
 					Domoticz.Log("Device Monitor "+str(Name)+" Status with id "+str(Id)+"2 was created.")
 
 		if Parameters["Mode6"] == "Debug":
@@ -143,11 +149,11 @@ class BasePlugin:
 			if Level == 10:
 				cmd = '/api/states/change/start.json'
 				self.api.call(cmd)
-			
+
 			if Level == 20:
 				cmd = '/api/states/change/stop.json'
 				self.api.call(cmd)
-			
+
 			if Level == 30:
 				cmd = '/api/states/change/restart.json'
 				self.api.call(cmd)
@@ -185,11 +191,11 @@ class BasePlugin:
 					params = {'Monitor[Enabled]':'1'}
 					self.api.call(cmd, params)
 					Devices[Unit].Update(nValue=1, sValue="On", TimedOut=0)
-				
+
 				if Command == "Off":
 					params = {'Monitor[Enabled]':'0'}
 					self.api.call(cmd, params)
-					Devices[Unit].Update(nValue=0, sValue="Off", TimedOut=0)			
+					Devices[Unit].Update(nValue=0, sValue="Off", TimedOut=0)
 
 	def onNotification(self, Name, Subject, Text, Status, Priority, Sound, ImageFile):
 		Domoticz.Log("Notification: " + Name + "," + Subject + "," + Text + "," + Status + "," + str(Priority) + "," + Sound + "," + ImageFile)
@@ -198,7 +204,7 @@ class BasePlugin:
 		Domoticz.Log("onDisconnect called")
 
 	def onHeartbeat(self):
-		Domoticz.Log("onHeartbeat called")
+		Domoticz.Log("onHeartbeat called")		
 		self.lastPolled = self.lastPolled + 1
 		if self.lastPolled > self.pollInterval:
 			self.lastPolled = 0
@@ -208,6 +214,35 @@ class BasePlugin:
 			if (len(Devices) == 0):
 				Domoticz.Debug("No devices found! Retrying to add devices...")
 				self.onStart()
+
+		for x in Devices:
+			#Get all existing monitors from ZoneMinder for update
+			Unit = x
+			monitorId = int(Unit / 10)
+			function = int(Unit % 10)
+			if Unit > 1:
+				if function == 1:
+					cmd = '/api/monitors.json'
+					monitors = self.api.call(cmd)
+					for monitor in monitors['monitors']:
+						Id = monitor['Monitor']['Id']
+						IdState = str(Id) +"1"
+						Function = monitor['Monitor']['Function']
+						Name = monitor['Monitor']['Name']
+						if str(x) == str(IdState):
+							Domoticz.Log("Update Device : ["+str(x)+"] Id : "+str(IdState)+" with Zoneminder Mode : "+str(Function))
+							if Function == "None":
+								Devices[x].Update(1,str(0))
+							if Function == "Monitor":
+								Devices[x].Update(1,str(10))
+							if Function == "Modect":
+								Devices[x].Update(1,str(20))
+							if Function == "Record":
+								Devices[x].Update(1,str(30))
+							if Function == "Mocord":
+								Devices[x].Update(1,str(40))
+							if Function == "Nodect":
+								Devices[x].Update(1,str(50))
 
 global _plugin
 _plugin = BasePlugin()
